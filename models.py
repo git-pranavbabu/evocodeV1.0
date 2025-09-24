@@ -27,3 +27,15 @@ class Lesson(BaseModel):
     content: str = Field(..., description="The markdown content of the lesson.")
     quiz: str = Field(..., description="A simple coding challenge related to the lesson.")
     topic_id: str = Field(..., description="The unique ID of the topic for this lesson.")
+
+class QuizSubmission(BaseModel):
+    """Data model for a user's quiz submission."""
+    topic_id: str
+    language_id: int = 71  # 71 is the Judge0 ID for Python
+    source_code: str
+
+class QuizResult(BaseModel):
+    """Data model for the result of a quiz submission."""
+    status: str
+    correct: bool
+    message: str

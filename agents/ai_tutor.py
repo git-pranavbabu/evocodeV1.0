@@ -1,33 +1,36 @@
 # agents/ai_tutor.py
-from models import UserProfile
+from models import UserProfile, Lesson # <-- IMPORT Lesson
 from . import student_model, content_generator, content_personalizer
 
-def run_learning_loop(user_profile: UserProfile) -> str:
+def run_learning_loop(user_profile: UserProfile) -> Lesson | None:
     """
-    The main orchestration logic for a user's learning session.
+    The main orchestration logic. Now returns a Lesson object or None.
     """
     print(f"\n--- Starting learning loop for {user_profile.userName} ---")
     
-    # 1. Get the next topic from the Student Model Agent
-    next_topic = student_model.get_next_topic(user_profile)
+    # Get the next topic and its ID from the Student Model Agent
+    next_topic_info = student_model.get_next_topic(user_profile)
     
-    if not next_topic:
+    if not next_topic_info:
         print("User has completed all topics. Congratulations!")
-        return "Congratulations! You have completed your learning goal."
+        return None
 
-    print(f"Next topic identified: {next_topic}")
+    topic_title = next_topic_info["title"]
+    topic_id = next_topic_info["id"]
+    print(f"Next topic identified: {topic_title} (ID: {topic_id})")
 
-    # 2. Content Generation & Personalization Loop
+    # Content Generation & Personalization Loop
     final_content = ""
-    max_retries = 2  # Safeguard against infinite loops
+    final_quiz = ""
+    max_retries = 2
 
     for attempt in range(max_retries):
         print(f"\n--- Attempt {attempt + 1} of {max_retries} ---")
         
-        # Call Content Generator
-        draft_content = content_generator.generate_content(next_topic, user_profile)
+        # Generator now returns two items
+        draft_content, draft_quiz = content_generator.generate_content(topic_title, user_profile)
         
-        # Call Content Personalizer for validation
+        # We only need to validate the lesson content for now
         is_approved, feedback = content_personalizer.personalize_and_validate(
             draft_content, user_profile.learningProfile
         )
@@ -35,15 +38,15 @@ def run_learning_loop(user_profile: UserProfile) -> str:
         if is_approved:
             print("Content approved by personalizer.")
             final_content = draft_content
-            break  # Exit the loop on success
+            final_quiz = draft_quiz
+            break
         else:
             print(f"Content rejected. Feedback: {feedback}")
-            # In a more advanced system, this feedback would be passed back
-            # to the generator for a targeted revision. For our MVP, we'll just retry.
-            final_content = draft_content # Keep the last version in case all attempts fail
+            final_content = draft_content # Keep the last version
+            final_quiz = draft_quiz
 
     if not final_content:
-         return "I'm sorry, I'm having trouble generating a lesson for you right now. Please try again later."
+        return Lesson(content="I'm sorry, I'm having trouble generating a lesson for you right now. Please try again later.", quiz="", topic_id=topic_id)
     
-    print("\n--- Learning loop finished. Returning final content. ---")
-    return final_content
+    print("\n--- Learning loop finished. Returning final lesson object. ---")
+    return Lesson(content=final_content, quiz=final_quiz, topic_id=topic_id)

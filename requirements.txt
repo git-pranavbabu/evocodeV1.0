@@ -15,3 +15,8 @@ torch
 google-cloud-firestore
 google-cloud-secret-manager
 google-auth
+beautifulsoup4
+lxml
+unstructured
+pypdf
+python-multipart

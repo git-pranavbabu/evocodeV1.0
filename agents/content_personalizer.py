@@ -8,6 +8,7 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 
 from langchain_core.pydantic_v1 import BaseModel, Field
+from . import llm_provider
 
 from models import LearningProfile
 
@@ -41,7 +42,7 @@ def get_validation_chain():
         print(f"FATAL: Could not load Groq API key from Secret Manager: {e}")
         raise e
     
-    llm = ChatGroq(model_name="llama-3.1-8b-instant", temperature=0)
+    llm = llm_provider.get_llm(temperature=0.7)
     parser = JsonOutputParser(pydantic_object=ValidationResult)
     
     template = """
