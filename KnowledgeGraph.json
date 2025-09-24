@@ -1,0 +1,64 @@
+{
+  "Python Basics - Getting Started": {
+    "Variables and Data Types": {
+      "id": "py-basics-datatypes-01",
+      "concepts": ["variable assignment", "naming conventions", "dynamic typing", "primitive types: int, float, str, bool"],
+      "methods": ["type()", "print()"],
+      "prerequisites": []
+    },
+    "Basic String Operations": {
+      "id": "py-basics-strings-01",
+      "concepts": ["string concatenation", "f-strings", "string indexing", "slicing"],
+      "methods": ["len()", ".upper()", ".lower()", ".strip()"],
+      "prerequisites": ["py-basics-datatypes-01"]
+    }
+  },
+  "Python Basics - Data Structures": {
+    "Lists": {
+      "id": "py-ds-lists-01",
+      "concepts": ["creating lists", "indexing", "slicing", "mutability"],
+      "methods": [".append()", ".pop()", ".insert()", ".remove()"],
+      "prerequisites": ["py-basics-strings-01"]
+    },
+    "Dictionaries": {
+      "id": "py-ds-dicts-01",
+      "concepts": ["key-value pairs", "creating dictionaries", "accessing values", "uniqueness of keys"],
+      "methods": [".keys()", ".values()", ".items()", ".get()"],
+      "prerequisites": ["py-ds-lists-01"]
+    },
+    "Tuples and Sets": {
+      "id": "py-ds-tuplesets-01",
+      "concepts": ["immutability of tuples", "when to use tuples", "unordered unique elements in sets"],
+      "methods": [".add()", ".union()", ".intersection()"],
+      "prerequisites": ["py-ds-lists-01"]
+    }
+  },
+  "Python Basics - Control Flow": {
+    "Conditional Statements": {
+      "id": "py-cf-conditionals-01",
+      "concepts": ["if, elif, else", "comparison operators", "logical operators: and, or, not"],
+      "methods": [],
+      "prerequisites": ["py-basics-datatypes-01"]
+    },
+    "For Loops": {
+      "id": "py-cf-forloops-01",
+      "concepts": ["iterating over sequences", "the range() function", "looping through lists and dictionaries"],
+      "methods": [],
+      "prerequisites": ["py-ds-lists-01"]
+    },
+    "While Loops": {
+      "id": "py-cf-whileloops-01",
+      "concepts": ["loop condition", "infinite loops", "break and continue statements"],
+      "methods": [],
+      "prerequisites": ["py-cf-conditionals-01"]
+    }
+  },
+  "Python Basics - Functions": {
+    "Defining Functions": {
+      "id": "py-func-define-01",
+      "concepts": ["def keyword", "parameters and arguments", "return statement", "docstrings"],
+      "methods": [],
+      "prerequisites": ["py-cf-forloops-01"]
+    }
+  }
+}

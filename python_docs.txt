@@ -1,0 +1,11 @@
+In Python, a variable allows you to store a value by assigning it a name. For example, 'x = 10'. The name must follow certain rules, like it cannot start with a number. Python has several basic data types: integers (int) for whole numbers, floats (float) for decimal numbers, strings (str) for text, and booleans (bool) for True/False values. Python is dynamically typed, meaning you don't have to declare the type of a variable.
+
+Strings are sequences of characters. You can combine them using the '+' operator, a process called concatenation. A modern way to format strings is using f-strings, like f"The value is {x}".
+
+A Python List is an ordered and changeable collection of items, which can be of different types. 'my_list = [1, "hello", 3.14]'. Items are accessed by their index, starting from 0. Lists are mutable, meaning you can change their content. You can add items with .append().
+
+A Python Dictionary stores data in key-value pairs. 'my_dict = {"name": "Alex", "age": 25}'. Keys must be unique. Dictionaries are optimized for retrieving data when you know the key.
+
+Control flow is managed using conditional statements and loops. The 'if', 'elif', and 'else' statements allow you to execute code blocks based on a condition. For loops are used to iterate over a sequence (like a list or a string). While loops execute a block of code as long as a condition is true.
+
+Functions are reusable blocks of code. You define a function using the 'def' keyword, followed by a function name and parentheses. 'def greet(name):'. The 'return' statement is used to send a value back from the function.
