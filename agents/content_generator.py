@@ -4,18 +4,30 @@ from operator import itemgetter
 from google.cloud import secretmanager
 import google.auth
 import re
+import json
 
 from langchain_groq import ChatGroq
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 from langchain_core.prompts import PromptTemplate
-from langchain_core.output_parsers import StrOutputParser
+from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
 from langchain.retrievers import EnsembleRetriever
+from langchain_core.pydantic_v1 import BaseModel, Field
 from . import llm_provider
 
-from models import UserProfile, Lesson
+from models import UserProfile, Lesson, MixedQuiz, MCQQuestion, CodingQuestion
 
-# The RAG chain is now built on-demand for each user, so we remove the global variable.
+
+# Load knowledge graph for topic details
+with open('KnowledgeGraph.json', 'r') as f:
+    knowledge_graph = json.load(f)
+
+
+class QuizGenerationResult(BaseModel):
+    """Structured result for quiz generation."""
+    mcq_questions: list = Field(description="List of 3 MCQ questions")
+    coding_question: dict = Field(description="Single coding question with all details")
+
 
 def get_rag_chain(user_profile: UserProfile):
     """
@@ -84,9 +96,9 @@ def get_rag_chain(user_profile: UserProfile):
     {context}
 
     **Your Task:**
-    1.  Generate a lesson to teach the user the specified topic, tailored to their learning style.
-    2.  Generate a simple coding challenge as a quiz.
-    3.  You MUST format your entire response by wrapping the lesson in <lesson> tags and the quiz in <quiz> tags.
+    1. Generate a lesson to teach the user the specified topic, tailored to their learning style.
+    2. Generate a simple coding challenge as a quiz.
+    3. You MUST format your entire response by wrapping the lesson in <lesson> tags and the quiz in <quiz> tags.
     """
     prompt = PromptTemplate.from_template(template)
     
@@ -103,6 +115,73 @@ def get_rag_chain(user_profile: UserProfile):
     
     print("RAG chain initialized successfully.")
     return rag_chain
+
+
+def get_quiz_generation_chain():
+    """Initialize chain for generating mixed quizzes (MCQ + coding)."""
+    llm = llm_provider.get_llm(temperature=0.8)  # Higher temperature for creative questions
+    parser = JsonOutputParser(pydantic_object=QuizGenerationResult)
+    
+    template = """
+    You are an expert programming instructor creating assessment questions.
+    
+    **Topic:** {topic_title}
+    **Quiz Type:** {quiz_type}
+    **Context Information:** {context}
+    
+    Generate exactly 3 MCQ questions and 1 coding question for this topic.
+    
+    **MCQ Questions Requirements:**
+    - Question 1: Test conceptual understanding (definitions, principles)
+    - Question 2: Test application knowledge (when/how to use)
+    - Question 3: Test code analysis (identify correct/incorrect usage)
+    - Each question must have exactly 4 options (A, B, C, D)
+    - Only one correct answer per question
+    
+    **Coding Question Requirements:**
+    - Small, focused problem (2-5 lines of code expected)
+    - Test core concept application, not complex algorithms
+    - Must be auto-gradable with clear expected output
+    - Include specific validation criteria
+    
+    **Important:** Your response must be valid JSON matching this exact structure:
+    {{
+        "mcq_questions": [
+            {{
+                "question": "Question text here?",
+                "options": ["Option A", "Option B", "Option C", "Option D"],
+                "correct_answer": 0
+            }},
+            {{
+                "question": "Question text here?", 
+                "options": ["Option A", "Option B", "Option C", "Option D"],
+                "correct_answer": 1
+            }},
+            {{
+                "question": "Question text here?",
+                "options": ["Option A", "Option B", "Option C", "Option D"], 
+                "correct_answer": 2
+            }}
+        ],
+        "coding_question": {{
+            "question": "Write Python code to...",
+            "expected_output": "Expected program output",
+            "validation_criteria": ["Must create variable named 'x'", "Must print result"],
+            "sample_solution": "x = 5\\nprint(x)"
+        }}
+    }}
+    
+    {format_instructions}
+    """
+    
+    prompt = PromptTemplate(
+        template=template,
+        input_variables=["topic_title", "quiz_type", "context"],
+        partial_variables={"format_instructions": parser.get_format_instructions()}
+    )
+    
+    return prompt | llm | parser
+
 
 def generate_content(topic: str, user_profile: UserProfile) -> tuple[str, str]:
     """Generates a personalized lesson using the ensemble RAG chain."""
@@ -127,3 +206,101 @@ def generate_content(topic: str, user_profile: UserProfile) -> tuple[str, str]:
         
     print("Content generation complete.")
     return (lesson_content, quiz_challenge)
+
+
+def generate_mixed_quiz(topic_title: str, topic_id: str, quiz_type: str, user_profile: UserProfile) -> MixedQuiz:
+    """
+    Generate a mixed quiz (3 MCQs + 1 coding question) for a specific topic.
+    
+    Args:
+        topic_title: Human readable topic name
+        topic_id: Unique topic identifier
+        quiz_type: 'onboarding' or 'post_lesson'
+        user_profile: User profile for context
+    """
+    print(f"Generating {quiz_type} quiz for topic: {topic_title}")
+    
+    try:
+        # Get context information using RAG chain
+        rag_chain = get_rag_chain(user_profile)
+        context_result = rag_chain.invoke({
+            "topic": topic_title,
+            "learning_style_tags": ""  # Don't need style tags for quiz generation
+        })
+        
+        # Extract just the context part (before lesson/quiz tags)
+        context = context_result.split('<lesson>')[0] if '<lesson>' in context_result else context_result[:500]
+        
+        # Generate quiz using specialized chain
+        quiz_chain = get_quiz_generation_chain()
+        quiz_result = quiz_chain.invoke({
+            "topic_title": topic_title,
+            "quiz_type": quiz_type,
+            "context": context
+        })
+        
+        # Convert to Pydantic models
+        mcq_questions = [
+            MCQQuestion(
+                question=mcq["question"],
+                options=mcq["options"],
+                correct_answer=mcq["correct_answer"]
+            ) for mcq in quiz_result["mcq_questions"]
+        ]
+        
+        coding_q = quiz_result["coding_question"]
+        coding_question = CodingQuestion(
+            question=coding_q["question"],
+            expected_output=coding_q["expected_output"],
+            validation_criteria=coding_q["validation_criteria"],
+            sample_solution=coding_q["sample_solution"]
+        )
+        
+        return MixedQuiz(
+            topic_id=topic_id,
+            topic_title=topic_title,
+            mcq_questions=mcq_questions,
+            coding_question=coding_question,
+            quiz_type=quiz_type
+        )
+        
+    except Exception as e:
+        print(f"Error generating mixed quiz: {e}")
+        # Return fallback quiz
+        return create_fallback_quiz(topic_title, topic_id, quiz_type)
+
+
+def create_fallback_quiz(topic_title: str, topic_id: str, quiz_type: str) -> MixedQuiz:
+    """Create a basic fallback quiz when AI generation fails."""
+    fallback_mcqs = [
+        MCQQuestion(
+            question=f"What is the main concept in {topic_title}?",
+            options=["Option A", "Option B", "Option C", "Option D"],
+            correct_answer=0
+        ),
+        MCQQuestion(
+            question=f"When would you use {topic_title}?",
+            options=["Always", "Never", "Sometimes", "Depends on context"],
+            correct_answer=3
+        ),
+        MCQQuestion(
+            question=f"Which statement about {topic_title} is correct?",
+            options=["Statement 1", "Statement 2", "Statement 3", "All of the above"],
+            correct_answer=2
+        )
+    ]
+    
+    fallback_coding = CodingQuestion(
+        question=f"Write a simple example demonstrating {topic_title}",
+        expected_output="Hello World",
+        validation_criteria=["Must contain print statement"],
+        sample_solution="print('Hello World')"
+    )
+    
+    return MixedQuiz(
+        topic_id=topic_id,
+        topic_title=topic_title,
+        mcq_questions=fallback_mcqs,
+        coding_question=fallback_coding,
+        quiz_type=quiz_type
+    )
